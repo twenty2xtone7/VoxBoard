@@ -22,6 +22,7 @@ struct ActiveVoice {
     size_t frame_cursor = 0;
     float volume = 1.0f;
     bool monitor_only = false;
+    std::string path; // sound path, for per-sound visualizer levels
 };
 
 class AudioPlayer {
@@ -55,6 +56,9 @@ public:
     float get_mic_level() const { return peak_mic_.load(); }
     float get_input_mic_level() const { return peak_input_mic_.load(); }
 
+    // Per-sound visualizer level (0.0f - 1.0f), keyed by sound path
+    float get_sound_level(const std::string &path) const;
+
     bool is_playing();
 
 private:
@@ -85,6 +89,10 @@ private:
     std::atomic<float> peak_monitor_{0.0f};
     std::atomic<float> peak_mic_{0.0f};
     std::atomic<float> peak_input_mic_{0.0f};
+
+    // Decaying per-sound peaks for the soundboard visualizer bars
+    mutable std::mutex sound_level_mutex_;
+    std::unordered_map<std::string, float> sound_levels_;
 
     std::mutex stream_mutex_;
     pa_simple *s_monitor_ = nullptr;

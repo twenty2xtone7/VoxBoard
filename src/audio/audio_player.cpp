@@ -211,6 +211,7 @@ void AudioPlayer::play(const std::string &path, float volume) {
     voice.frame_cursor = 0;
     voice.volume = volume;
     voice.monitor_only = false;
+    voice.path = path;
 
     std::lock_guard<std::mutex> lock(voice_mutex_);
     active_voices_.push_back(voice);
@@ -225,9 +226,16 @@ void AudioPlayer::play_preview(const std::string &path, float volume) {
     voice.frame_cursor = 0;
     voice.volume = volume;
     voice.monitor_only = true;
+    voice.path = path;
 
     std::lock_guard<std::mutex> lock(voice_mutex_);
     active_voices_.push_back(voice);
+}
+
+float AudioPlayer::get_sound_level(const std::string &path) const {
+    std::lock_guard<std::mutex> lock(sound_level_mutex_);
+    auto it = sound_levels_.find(path);
+    return it != sound_levels_.end() ? it->second : 0.0f;
 }
 
 void AudioPlayer::stop_all() {
@@ -251,6 +259,17 @@ void AudioPlayer::audio_loop() {
     std::vector<float> mix_buf_mic(BUFFER_FRAMES * TARGET_CHANNELS);
 
     while (running_) {
+        // Decay every per-sound level so bars glide back down after a sound finishes.
+        {
+            std::lock_guard<std::mutex> lvl_lock(sound_level_mutex_);
+            for (auto &kv : sound_levels_) {
+                // Slow envelope decay (~200ms half-life) so the UI receives a
+                // smooth target instead of a spiky per-block peak.
+                kv.second *= 0.965f;
+                if (kv.second < 0.0005f) kv.second = 0.0f;
+            }
+        }
+
         bool has_voices = false;
         {
             std::lock_guard<std::mutex> lock(voice_mutex_);
@@ -279,12 +298,22 @@ void AudioPlayer::audio_loop() {
                 const float *src = voice.buffer->samples.data() + (voice.frame_cursor * TARGET_CHANNELS);
                 float vol = voice.volume;
 
+                float voice_peak = 0.0f;
                 for (size_t i = 0; i < frames_to_mix * TARGET_CHANNELS; ++i) {
                     float s = src[i] * vol;
+                    float a = std::fabs(s);
+                    if (a > voice_peak) voice_peak = a;
                     mix_buf_monitor[i] += s;
                     if (!voice.monitor_only) {
                         mix_buf_mic[i] += s;
                     }
+                }
+
+                // Keep this sound's visualizer level topped up while it plays.
+                if (!voice.path.empty()) {
+                    std::lock_guard<std::mutex> lvl_lock(sound_level_mutex_);
+                    float &sl = sound_levels_[voice.path];
+                    if (voice_peak > sl) sl = voice_peak;
                 }
 
                 voice.frame_cursor += frames_to_mix;

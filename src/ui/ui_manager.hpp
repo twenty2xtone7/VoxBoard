@@ -94,6 +94,8 @@ private:
     void render_global_keybinds(AppConfig &config);
 
     void render_level_meter(const char *label, float level, bool muted, float volume = 1.0f);
+    float smooth_level(const std::string &key, float target);
+    void render_sound_name_cell_fill(const std::string &id, const std::string &path);
     void render_routing_graph(const AppConfig &config);
     void handle_key_capture(AppConfig &config);
 
@@ -123,6 +125,14 @@ private:
     std::chrono::steady_clock::time_point last_device_refresh_;
     std::chrono::steady_clock::time_point test_mic_start_time_;
     bool is_testing_mic_ = false;
+
+    // Per-meter smoothing state for stable, framerate-independent level bars
+    struct MeterSmoothState {
+        float value = 0.0f;
+        bool has_last = false;
+        std::chrono::steady_clock::time_point last_update;
+    };
+    std::unordered_map<std::string, MeterSmoothState> meter_smoothing_;
 };
 
 } // namespace UI

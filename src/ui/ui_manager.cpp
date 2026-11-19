@@ -5,6 +5,7 @@
 #include "keybinds/hyprland_binds.hpp"
 
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
 #include <GLFW/glfw3.h>
@@ -475,10 +476,14 @@ void UIManager::render_soundboard(AppConfig &config) {
         ImGui::TableHeadersRow();
 
         std::string sound_to_delete;
+        // Pin the row height to its natural content height (tallest widget is
+        // a 24px button + cell padding) so TableGetCellBgRect() already reports
+        // the full cell rectangle when the Sound Name column is submitted.
+        const float row_min_height = 24.0f + ImGui::GetStyle().CellPadding.y * 2.0f;
 
         for (size_t i = 0; i < selected_group->sounds.size(); ++i) {
             auto &snd = selected_group->sounds[i];
-            ImGui::TableNextRow();
+            ImGui::TableNextRow(0, row_min_height);
 
             // Column 0: Play
             ImGui::TableNextColumn();
@@ -487,8 +492,9 @@ void UIManager::render_soundboard(AppConfig &config) {
                 if (events_.on_play_sound) events_.on_play_sound(snd.path, snd.volume);
             }
 
-            // Column 1: Name
+            // Column 1: Name — level fill covers the whole cell, behind the text
             ImGui::TableNextColumn();
+            render_sound_name_cell_fill(snd.id, snd.path);
             ImGui::Text("%s", snd.name.c_str());
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("%s", snd.path.c_str());
@@ -509,7 +515,7 @@ void UIManager::render_soundboard(AppConfig &config) {
             std::string btn_id = btn_label + "##bind_" + snd.id;
 
             if (is_listening) {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.5f, 0.1f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_Button, Theme::KeyCapture);
             }
 
             if (ImGui::Button(btn_id.c_str(), ImVec2(170, 24))) {
@@ -802,25 +808,87 @@ void UIManager::render_myinstants(AppConfig &config) {
     }
 }
 
+float UIManager::smooth_level(const std::string &key, float target) {
+    // Framerate-independent smoothing with asymmetric ballistics:
+    // fast attack so transients register, slow release so the bar glides down.
+    auto &state = meter_smoothing_[key];
+    const auto now = std::chrono::steady_clock::now();
+    float dt = 0.0f;
+    if (state.has_last) {
+        dt = std::chrono::duration<float>(now - state.last_update).count();
+    }
+    state.last_update = now;
+    state.has_last = true;
+
+    target = std::clamp(target, 0.0f, 1.0f);
+    if (dt > 0.0f) {
+        // Clamp dt to avoid a large jump after the window was hidden / stalled.
+        dt = std::min(dt, 0.25f);
+        // Slow, ease-in attack and a long fall. The source envelope is already
+        // smoothed, so a single gentle curve avoids tau-flip jitter.
+        const float tau = 0.26f;
+        const float alpha = 1.0f - std::exp(-dt / tau);
+        state.value += alpha * (target - state.value);
+    } else {
+        state.value = target;
+    }
+    return state.value;
+}
+
 void UIManager::render_level_meter(const char *label, float level, bool muted, float volume) {
+    const float display = smooth_level(label, muted ? 0.0f : level);
+
     ImGui::Text("%s:", label);
     ImGui::SameLine(180);
     if (muted) {
-        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, Theme::MeterMuted);
         ImGui::ProgressBar(0.0f, ImVec2(240, 16), "MUTED");
         ImGui::PopStyleColor();
         return;
     }
 
-    ImVec4 col = ImVec4(0.2f, 0.8f, 0.2f, 1.0f);
-    if (level > 0.85f) col = ImVec4(0.9f, 0.2f, 0.2f, 1.0f);
-    else if (level > 0.65f) col = ImVec4(0.9f, 0.8f, 0.2f, 1.0f);
+    ImVec4 col = Theme::Success;
+    if (display > 0.85f) col = Theme::Danger;
+    else if (display > 0.65f) col = Theme::Warning;
 
     ImGui::PushStyleColor(ImGuiCol_PlotHistogram, col);
     char buf[32];
-    snprintf(buf, sizeof(buf), "%.0f%%", std::clamp(level, 0.0f, 1.0f) * 100.0f);
-    ImGui::ProgressBar(std::clamp(level, 0.0f, 1.0f), ImVec2(240, 16), buf);
+    snprintf(buf, sizeof(buf), "%.0f%%", display * 100.0f);
+    ImGui::ProgressBar(display, ImVec2(240, 16), buf);
     ImGui::PopStyleColor();
+}
+
+void UIManager::render_sound_name_cell_fill(const std::string &id, const std::string &path) {
+    const float raw = Audio::AudioPlayer::instance().get_sound_level(path);
+    const float display = smooth_level("sound##" + id, raw);
+
+    // Use the real Sound Name cell rectangle (column 1) as the visualizer region.
+    ImGuiTable *table = ImGui::GetCurrentTable();
+    if (!table || display <= 0.0f) return;
+    const ImRect cell = ImGui::TableGetCellBgRect(table, 1);
+    if (cell.Min.x >= cell.Max.x || cell.Min.y >= cell.Max.y) return;
+
+    ImDrawList *dl = ImGui::GetWindowDrawList();
+    // Clip strictly to the cell so the fill can never spill into adjacent
+    // columns or outside the row (also intersects with ImGui's column clip).
+    dl->PushClipRect(cell.Min, cell.Max, true);
+    const float fill_w = (cell.Max.x - cell.Min.x) * display;
+    const ImU32 solid = ImGui::ColorConvertFloat4ToU32(Theme::SoundMeter);
+    const ImU32 faded = ImGui::ColorConvertFloat4ToU32(ImVec4(Theme::SoundMeter.x, Theme::SoundMeter.y, Theme::SoundMeter.z, 0.0f));
+
+    // Soft (blurred) leading edge: solid body + a short horizontal alpha fade.
+    const float blur_w = ImMin(22.0f, fill_w);
+    const float fade_start = cell.Min.x + fill_w - blur_w;
+    if (fill_w > blur_w) {
+        dl->AddRectFilled(cell.Min, ImVec2(fade_start, cell.Max.y), solid);
+    }
+    if (blur_w > 0.0f) {
+        dl->AddRectFilledMultiColor(
+            ImVec2(fade_start, cell.Min.y),
+            ImVec2(cell.Min.x + fill_w, cell.Max.y),
+            solid, faded, faded, solid);
+    }
+    dl->PopClipRect();
 }
 
 void UIManager::render_routing_graph(const AppConfig &config) {
@@ -828,7 +896,7 @@ void UIManager::render_routing_graph(const AppConfig &config) {
     std::string out_str = config.soundboard_output_device.empty() ? "System Default Output" : config.soundboard_output_device;
     std::string desktop_str = config.desktop_capture_source.empty() ? "System Output Monitor" : config.desktop_capture_source;
 
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.08f, 0.08f, 0.08f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, Theme::SurfaceDeep);
     ImGui::BeginChild("RoutingGraphFrame", ImVec2(0, 140), true);
 
     ImGui::Text("  [Physical Mic: %s] --(Loopback Passthrough: %s)----+",
