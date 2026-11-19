@@ -4,6 +4,11 @@
 #include <iostream>
 #include <climits>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/poll.h>
+#include <cstring>
+#include <chrono>
 
 namespace Keybinds {
 
@@ -28,7 +33,72 @@ std::string HyprlandManager::get_executable_path() {
     return "voxboard";
 }
 
+// ponytail: Hyprland's own IPC socket speaks the same "eval" command as hyprctl.
+// Talking to it directly avoids fork+exec (and the /bin/sh wrapper) on every
+// bind/unbind, which otherwise floods the process table with short-lived
+// "hyprctl eval hl.bind(...)" and "sh -c ..." processes.
+static std::string hyprland_socket_path() {
+    const char *runtime = std::getenv("XDG_RUNTIME_DIR");
+    const char *sig = std::getenv("HYPRLAND_INSTANCE_SIGNATURE");
+    if (!runtime || !sig) return "";
+    return std::string(runtime) + "/hypr/" + sig + "/.socket.sock";
+}
+
 bool HyprlandManager::run_hyprctl(const std::string &lua_expr, std::string *error_out) {
+    const std::string path = hyprland_socket_path();
+    if (!path.empty()) {
+        int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+        if (fd >= 0) {
+            struct sockaddr_un addr;
+            std::memset(&addr, 0, sizeof(addr));
+            addr.sun_family = AF_UNIX;
+            std::strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path) - 1);
+
+            if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+                // Bound the whole exchange so a stalled compositor can never
+                // strand this call (and pile up waiting processes/threads).
+                const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+                auto ms_left = [&deadline]() -> int {
+                    auto left = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        deadline - std::chrono::steady_clock::now()).count();
+                    return left > 0 ? (int)left : 0;
+                };
+
+                std::string request = "eval " + lua_expr;
+                size_t sent = 0;
+                while (sent < request.size()) {
+                    struct pollfd pfd{fd, POLLOUT, 0};
+                    if (poll(&pfd, 1, ms_left()) <= 0 || !(pfd.revents & POLLOUT)) break;
+                    ssize_t n = send(fd, request.data() + sent, request.size() - sent, MSG_NOSIGNAL);
+                    if (n <= 0) break;
+                    sent += (size_t)n;
+                }
+                shutdown(fd, SHUT_WR);
+
+                std::string out;
+                char buf[512];
+                while (true) {
+                    struct pollfd pfd{fd, POLLIN, 0};
+                    int pr = poll(&pfd, 1, ms_left());
+                    if (pr <= 0 || !(pfd.revents & POLLIN)) break;
+                    ssize_t n = recv(fd, buf, sizeof(buf), 0);
+                    if (n <= 0) break;
+                    out.append(buf, (size_t)n);
+                }
+                close(fd);
+
+                if (out.find("error") != std::string::npos) {
+                    if (error_out) *error_out = out;
+                    std::cerr << "[HyprlandManager] Hyprland error: " << out << "\n";
+                    return false;
+                }
+                return !out.empty();
+            }
+            close(fd);
+        }
+    }
+
+    // Fallback for environments without the socket (socket closed / no SNI).
     std::string cmd = "hyprctl eval '" + lua_expr + "' 2>&1";
     FILE *fp = popen(cmd.c_str(), "r");
     if (!fp) return false;
