@@ -12,10 +12,129 @@
 #include <filesystem>
 #include <iostream>
 #include <thread>
+#include <cmath>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
 namespace UI {
+
+namespace Theme {
+
+void apply() {
+    ImGuiStyle &style = ImGui::GetStyle();
+
+    // Subtle modern rounding
+    style.WindowRounding    = 6.0f;
+    style.ChildRounding     = 4.0f;
+    style.FrameRounding     = 4.0f;
+    style.PopupRounding     = 4.0f;
+    style.ScrollbarRounding = 4.0f;
+    style.GrabRounding      = 3.0f;
+    style.TabRounding       = 4.0f;
+
+    // Borders
+    style.WindowBorderSize   = 1.0f;
+    style.ChildBorderSize    = 1.0f;
+    style.PopupBorderSize    = 1.0f;
+    style.FrameBorderSize    = 1.0f;
+    style.TabBorderSize      = 0.0f;
+    style.TabBarBorderSize   = 1.0f;
+    style.TabBarOverlineSize = 2.0f;
+
+    // Dimensions
+    style.ScrollbarSize     = 12.0f;
+    style.GrabMinSize       = 10.0f;
+
+    ImVec4 *c = style.Colors;
+
+    // Background surfaces (deep charcoal palette)
+    c[ImGuiCol_WindowBg]              = ImVec4(0.10f, 0.10f, 0.12f, 1.00f);
+    c[ImGuiCol_ChildBg]               = ImVec4(0.12f, 0.12f, 0.15f, 1.00f);
+    c[ImGuiCol_PopupBg]               = ImVec4(0.13f, 0.13f, 0.16f, 0.98f);
+    c[ImGuiCol_Border]                = ImVec4(0.22f, 0.22f, 0.27f, 0.70f);
+    c[ImGuiCol_BorderShadow]          = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+
+    // Form controls & input surfaces
+    c[ImGuiCol_FrameBg]               = ImVec4(0.15f, 0.15f, 0.19f, 1.00f);
+    c[ImGuiCol_FrameBgHovered]        = ImVec4(0.20f, 0.20f, 0.26f, 1.00f);
+    c[ImGuiCol_FrameBgActive]         = ImVec4(0.25f, 0.24f, 0.33f, 1.00f);
+
+    // Title / Menu bars
+    c[ImGuiCol_TitleBg]               = ImVec4(0.10f, 0.10f, 0.12f, 1.00f);
+    c[ImGuiCol_TitleBgActive]         = ImVec4(0.14f, 0.14f, 0.18f, 1.00f);
+    c[ImGuiCol_TitleBgCollapsed]      = ImVec4(0.09f, 0.09f, 0.11f, 1.00f);
+    c[ImGuiCol_MenuBarBg]             = ImVec4(0.12f, 0.12f, 0.15f, 1.00f);
+
+    // Scrollbars
+    c[ImGuiCol_ScrollbarBg]           = ImVec4(0.10f, 0.10f, 0.13f, 0.40f);
+    c[ImGuiCol_ScrollbarGrab]         = ImVec4(0.24f, 0.23f, 0.31f, 0.80f);
+    c[ImGuiCol_ScrollbarGrabHovered]  = ImVec4(0.33f, 0.31f, 0.42f, 0.90f);
+    c[ImGuiCol_ScrollbarGrabActive]   = ImVec4(0.42f, 0.40f, 0.55f, 1.00f);
+
+    // Checkmarks & Sliders (muted indigo/violet)
+    c[ImGuiCol_CheckMark]             = ImVec4(0.68f, 0.64f, 0.90f, 1.00f);
+    c[ImGuiCol_CheckboxSelectedBg]    = ImVec4(0.22f, 0.21f, 0.32f, 1.00f);
+    c[ImGuiCol_SliderGrab]            = ImVec4(0.46f, 0.43f, 0.64f, 1.00f);
+    c[ImGuiCol_SliderGrabActive]      = ImVec4(0.58f, 0.54f, 0.78f, 1.00f);
+
+    // Buttons
+    c[ImGuiCol_Button]                = ImVec4(0.22f, 0.21f, 0.30f, 0.90f);
+    c[ImGuiCol_ButtonHovered]         = ImVec4(0.32f, 0.30f, 0.44f, 1.00f);
+    c[ImGuiCol_ButtonActive]          = ImVec4(0.42f, 0.39f, 0.58f, 1.00f);
+
+    // Headers & selections
+    c[ImGuiCol_Header]                = ImVec4(0.22f, 0.21f, 0.32f, 0.85f);
+    c[ImGuiCol_HeaderHovered]         = ImVec4(0.32f, 0.30f, 0.46f, 0.90f);
+    c[ImGuiCol_HeaderActive]          = ImVec4(0.40f, 0.38f, 0.56f, 1.00f);
+
+    // Separators
+    c[ImGuiCol_Separator]             = ImVec4(0.20f, 0.20f, 0.26f, 0.80f);
+    c[ImGuiCol_SeparatorHovered]      = ImVec4(0.38f, 0.35f, 0.52f, 0.80f);
+    c[ImGuiCol_SeparatorActive]       = ImVec4(0.48f, 0.44f, 0.66f, 1.00f);
+
+    // Resize grip
+    c[ImGuiCol_ResizeGrip]            = ImVec4(0.26f, 0.25f, 0.36f, 0.30f);
+    c[ImGuiCol_ResizeGripHovered]     = ImVec4(0.38f, 0.36f, 0.52f, 0.65f);
+    c[ImGuiCol_ResizeGripActive]      = ImVec4(0.50f, 0.47f, 0.68f, 0.90f);
+
+    // Tabs
+    c[ImGuiCol_Tab]                   = ImVec4(0.14f, 0.14f, 0.18f, 1.00f);
+    c[ImGuiCol_TabHovered]            = ImVec4(0.30f, 0.28f, 0.44f, 0.85f);
+    c[ImGuiCol_TabSelected]           = ImVec4(0.22f, 0.21f, 0.31f, 1.00f);
+    c[ImGuiCol_TabSelectedOverline]   = ImVec4(0.68f, 0.64f, 0.90f, 1.00f);
+    c[ImGuiCol_TabDimmed]             = ImVec4(0.12f, 0.12f, 0.15f, 1.00f);
+    c[ImGuiCol_TabDimmedSelected]     = ImVec4(0.18f, 0.17f, 0.24f, 1.00f);
+    c[ImGuiCol_TabDimmedSelectedOverline] = ImVec4(0.42f, 0.40f, 0.56f, 1.00f);
+
+    // Plots & meters
+    c[ImGuiCol_PlotLines]             = ImVec4(0.55f, 0.52f, 0.74f, 1.00f);
+    c[ImGuiCol_PlotLinesHovered]      = ImVec4(0.68f, 0.64f, 0.90f, 1.00f);
+    c[ImGuiCol_PlotHistogram]         = ImVec4(0.44f, 0.41f, 0.62f, 1.00f);
+    c[ImGuiCol_PlotHistogramHovered]  = ImVec4(0.58f, 0.54f, 0.80f, 1.00f);
+
+    // Tables
+    c[ImGuiCol_TableHeaderBg]         = ImVec4(0.15f, 0.15f, 0.19f, 1.00f);
+    c[ImGuiCol_TableBorderStrong]     = ImVec4(0.24f, 0.24f, 0.30f, 0.85f);
+    c[ImGuiCol_TableBorderLight]      = ImVec4(0.18f, 0.18f, 0.23f, 0.60f);
+    c[ImGuiCol_TableRowBg]            = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    c[ImGuiCol_TableRowBgAlt]         = ImVec4(0.14f, 0.14f, 0.18f, 0.45f);
+
+    // Text & typography contrast
+    c[ImGuiCol_Text]                  = ImVec4(0.92f, 0.93f, 0.95f, 1.00f);
+    c[ImGuiCol_TextDisabled]          = ImVec4(0.48f, 0.49f, 0.56f, 1.00f);
+    c[ImGuiCol_TextSelectedBg]        = ImVec4(0.35f, 0.32f, 0.50f, 0.55f);
+    c[ImGuiCol_TextLink]              = ImVec4(0.68f, 0.65f, 0.90f, 1.00f);
+
+    // Navigation & Modals
+    c[ImGuiCol_NavCursor]             = ImVec4(0.55f, 0.51f, 0.76f, 0.80f);
+    c[ImGuiCol_NavWindowingHighlight] = ImVec4(0.60f, 0.56f, 0.82f, 0.70f);
+    c[ImGuiCol_NavWindowingDimBg]     = ImVec4(0.10f, 0.10f, 0.13f, 0.60f);
+    c[ImGuiCol_ModalWindowDimBg]      = ImVec4(0.08f, 0.08f, 0.10f, 0.65f);
+    c[ImGuiCol_InputTextCursor]       = ImVec4(0.90f, 0.90f, 0.95f, 1.00f);
+}
+
+} // namespace Theme
 
 UIManager& UIManager::instance() {
     static UIManager inst;
@@ -39,8 +158,29 @@ bool UIManager::init(GLFWwindow *window, const UIEvents &events) {
     (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-    // Default Dear ImGui dark theme without custom styling
-    ImGui::StyleColorsDark();
+    // Load clean readable system UI font if present, fallback to Dear ImGui default
+    ImFontConfig font_cfg;
+    font_cfg.OversampleH = 2;
+    font_cfg.OversampleV = 2;
+    font_cfg.PixelSnapH = true;
+    const char *font_paths[] = {
+        "/usr/share/fonts/Adwaita/AdwaitaSans-Regular.ttf",
+        "/usr/share/fonts/noto/NotoSans-Regular.ttf"
+    };
+    bool font_loaded = false;
+    for (const char *path : font_paths) {
+        if (fs::exists(path)) {
+            io.Fonts->AddFontFromFileTTF(path, 15.0f, &font_cfg);
+            font_loaded = true;
+            break;
+        }
+    }
+    if (!font_loaded) {
+        io.Fonts->AddFontDefault();
+    }
+
+    // Apply centralized custom theme
+    Theme::apply();
 
     ImGui_ImplGlfw_InitForOpenGL(window_, true);
     ImGui_ImplOpenGL3_Init("#version 130");
@@ -135,7 +275,7 @@ void UIManager::render_header(AppConfig &config) {
     }
     ImGui::SameLine();
     bool is_stop_listening_hdr = (listen_target_ == ListenTarget::StopAll);
-    if (is_stop_listening_hdr) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.5f, 0.1f, 1.0f));
+    if (is_stop_listening_hdr) ImGui::PushStyleColor(ImGuiCol_Button, Theme::KeyCapture);
     if (ImGui::Button(is_stop_listening_hdr ? "[Press Key...]##hdr_stop" : "Edit Bind##hdr_stop", ImVec2(0, 26))) {
         if (is_stop_listening_hdr) {
             listen_target_ = ListenTarget::None;
@@ -210,7 +350,7 @@ void UIManager::render_soundboard(AppConfig &config) {
 
         std::string tab_label = grp.name + "##grp_" + grp.id;
         if (is_active) {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.6f, 0.2f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Button, Theme::GroupActive);
         }
 
         if (ImGui::Button(tab_label.c_str())) {
@@ -430,7 +570,7 @@ void UIManager::render_global_keybinds(AppConfig &config) {
 
     if (!conflict_warning_.empty()) {
         ImGui::Spacing();
-        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", conflict_warning_.c_str());
+        ImGui::TextColored(Theme::Danger, "%s", conflict_warning_.c_str());
         ImGui::SameLine();
         if (ImGui::SmallButton("Dismiss##conflict")) {
             conflict_warning_.clear();
@@ -438,7 +578,7 @@ void UIManager::render_global_keybinds(AppConfig &config) {
         ImGui::Spacing();
     }
 
-    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "Global Keybindings (Hyprland / Wayland - Cross-Group):");
+    ImGui::TextColored(Theme::TextHeader, "Global Keybindings (Hyprland / Wayland - Cross-Group):");
 
     if (ImGui::BeginTable("GlobalActionsTable", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthStretch);
@@ -455,7 +595,7 @@ void UIManager::render_global_keybinds(AppConfig &config) {
         ImGui::TableNextColumn();
         bool is_stop_listening = (listen_target_ == ListenTarget::StopAll);
         std::string stop_btn_label = is_stop_listening ? "[Press Key...]" : (config.stop_all_keybind.empty() ? "[Unassigned]" : config.stop_all_keybind);
-        if (is_stop_listening) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.5f, 0.1f, 1.0f));
+        if (is_stop_listening) ImGui::PushStyleColor(ImGuiCol_Button, Theme::KeyCapture);
         if (ImGui::Button((stop_btn_label + "##stop_all").c_str(), ImVec2(190, 24))) {
             if (is_stop_listening) {
                 listen_target_ = ListenTarget::None;
@@ -493,7 +633,7 @@ void UIManager::render_global_keybinds(AppConfig &config) {
         ImGui::TableNextColumn();
         bool is_media_listening = (listen_target_ == ListenTarget::ToggleMedia);
         std::string media_btn_label = is_media_listening ? "[Press Key...]" : (config.toggle_media_keybind.empty() ? "[Unassigned]" : config.toggle_media_keybind);
-        if (is_media_listening) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.5f, 0.1f, 1.0f));
+        if (is_media_listening) ImGui::PushStyleColor(ImGuiCol_Button, Theme::KeyCapture);
         if (ImGui::Button((media_btn_label + "##toggle_media").c_str(), ImVec2(190, 24))) {
             if (is_media_listening) {
                 listen_target_ = ListenTarget::None;
@@ -563,7 +703,7 @@ void UIManager::render_myinstants(AppConfig &config) {
     }
 
     if (!status_message_.empty()) {
-        ImGui::TextColored(ImVec4(0.3f, 0.9f, 0.3f, 1.0f), "%s", status_message_.c_str());
+        ImGui::TextColored(Theme::Success, "%s", status_message_.c_str());
     }
 
     ImGui::Spacing();
@@ -744,7 +884,7 @@ void UIManager::render_audio_settings(AppConfig &config) {
     }
 
     // 1. Physical Microphone
-    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "1. Physical Microphone Input Device:");
+    ImGui::TextColored(Theme::TextHeader, "1. Physical Microphone Input Device:");
     std::string current_mic_label = "Default Microphone (@DEFAULT_SOURCE@)";
     for (const auto &m : mic_sources) {
         if (m.name == config.physical_mic_device) {
@@ -796,7 +936,7 @@ void UIManager::render_audio_settings(AppConfig &config) {
     ImGui::Spacing();
 
     // 2. Soundboard Playback Output
-    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "2. Soundboard Playback Output Device (Headphones / Speakers):");
+    ImGui::TextColored(Theme::TextHeader, "2. Soundboard Playback Output Device (Headphones / Speakers):");
     std::string current_out_label = "System Default Output (@DEFAULT_SINK@)";
     for (const auto &o : output_sinks) {
         if (o.name == config.soundboard_output_device) {
@@ -848,7 +988,7 @@ void UIManager::render_audio_settings(AppConfig &config) {
     ImGui::Spacing();
 
     // 3. Desktop Audio Capture
-    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "3. Desktop Audio Capture Source (Media-to-Mic Capture):");
+    ImGui::TextColored(Theme::TextHeader, "3. Desktop Audio Capture Source (Media-to-Mic Capture):");
     std::string current_desktop_label = "Default Output Monitor (@DEFAULT_SINK@.monitor)";
     for (const auto &m : monitor_sources) {
         if (m.name == config.desktop_capture_source) {
@@ -887,7 +1027,7 @@ void UIManager::render_audio_settings(AppConfig &config) {
     ImGui::SameLine();
     bool is_media_listening_aud = (listen_target_ == ListenTarget::ToggleMedia);
     std::string media_btn_label = is_media_listening_aud ? "[Press Key...]" : (config.toggle_media_keybind.empty() ? "[Bind Media Key]" : ("Bind: " + config.toggle_media_keybind));
-    if (is_media_listening_aud) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.5f, 0.1f, 1.0f));
+    if (is_media_listening_aud) ImGui::PushStyleColor(ImGuiCol_Button, Theme::KeyCapture);
     if (ImGui::Button((media_btn_label + "##audio_media_bind").c_str(), ImVec2(0, 24))) {
         if (is_media_listening_aud) {
             listen_target_ = ListenTarget::None;
@@ -903,7 +1043,7 @@ void UIManager::render_audio_settings(AppConfig &config) {
     ImGui::Spacing();
 
     // 4. Virtual Microphone Device Info
-    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "4. Virtual Microphone Output Device:");
+    ImGui::TextColored(Theme::TextHeader, "4. Virtual Microphone Output Device:");
     ImGui::BulletText("Device Node: VoxBoard_Mic [Audio/Source]");
     ImGui::BulletText("Mixer Bus: VoxBoard_Sink (Null-sink stereo 48000Hz)");
     ImGui::BulletText("Setup in Apps: Set Input Device to 'VoxBoard_Virtual_Microphone' in Discord or game settings.");
@@ -946,15 +1086,15 @@ void UIManager::render_virtual_mic_setup(AppConfig &config) {
     }
     ImGui::SameLine();
     if (config.virtual_mic_enabled) {
-        ImGui::TextColored(ImVec4(0.2f, 0.9f, 0.2f, 1.0f), "[ENABLED - Online]");
+        ImGui::TextColored(Theme::Success, "[ENABLED - Online]");
     } else {
-        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "[DISABLED - Local Audio Only]");
+        ImGui::TextDisabled("[DISABLED - Local Audio Only]");
     }
 
     ImGui::Spacing();
 
     // Channel Routing Controls
-    ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.2f, 1.0f), "Channels Feeding Into Virtual Microphone:");
+    ImGui::TextColored(Theme::TextSubhead, "Channels Feeding Into Virtual Microphone:");
 
     bool passthru = config.mic_passthrough;
     if (ImGui::Checkbox("Physical Microphone Passthrough", &passthru)) {
@@ -981,7 +1121,7 @@ void UIManager::render_virtual_mic_setup(AppConfig &config) {
     ImGui::Spacing();
 
     // Routing Graph
-    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "Active Audio Routing Topology:");
+    ImGui::TextColored(Theme::TextHeader, "Active Audio Routing Topology:");
     render_routing_graph(config);
 
     ImGui::Spacing();
@@ -989,7 +1129,7 @@ void UIManager::render_virtual_mic_setup(AppConfig &config) {
     ImGui::Spacing();
 
     // Test Virtual Microphone
-    ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.2f, 1.0f), "Test Virtual Microphone (Hear What Others Hear):");
+    ImGui::TextColored(Theme::TextSubhead, "Test Virtual Microphone (Hear What Others Hear):");
     ImGui::Text("Temporarily routes VoxBoard_Mic directly to your headphones so you can verify your soundboard and mic:");
 
     if (!is_testing_mic_) {
@@ -1022,17 +1162,17 @@ void UIManager::render_virtual_mic_setup(AppConfig &config) {
     ImGui::Spacing();
 
     // Health Check & Repair
-    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "Virtual Device Diagnostics & Auto-Repair:");
+    ImGui::TextColored(Theme::TextHeader, "Virtual Device Diagnostics & Auto-Repair:");
     bool sink_ok = false, source_ok = false;
     bool healthy = Audio::PipeWireManager::instance().check_health(sink_ok, source_ok);
 
     if (healthy) {
-        ImGui::TextColored(ImVec4(0.2f, 0.9f, 0.2f, 1.0f), "[OK] Virtual sink (VoxBoard_Sink): ONLINE");
-        ImGui::TextColored(ImVec4(0.2f, 0.9f, 0.2f, 1.0f), "[OK] Virtual source (VoxBoard_Mic): ONLINE");
+        ImGui::TextColored(Theme::Success, "[OK] Virtual sink (VoxBoard_Sink): ONLINE");
+        ImGui::TextColored(Theme::Success, "[OK] Virtual source (VoxBoard_Mic): ONLINE");
     } else {
-        if (!sink_ok) ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "[ERR] Virtual sink (VoxBoard_Sink): MISSING");
-        if (!source_ok) ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "[ERR] Virtual source (VoxBoard_Mic): MISSING");
-        ImGui::TextColored(ImVec4(0.9f, 0.6f, 0.2f, 1.0f), "PipeWire service may have restarted or modules were unloaded.");
+        if (!sink_ok) ImGui::TextColored(Theme::Danger, "[ERR] Virtual sink (VoxBoard_Sink): MISSING");
+        if (!source_ok) ImGui::TextColored(Theme::Danger, "[ERR] Virtual source (VoxBoard_Mic): MISSING");
+        ImGui::TextColored(Theme::Warning, "PipeWire service may have restarted or modules were unloaded.");
         if (ImGui::Button("Repair Virtual Audio Devices")) {
             if (events_.on_repair_pipewire) events_.on_repair_pipewire();
         }

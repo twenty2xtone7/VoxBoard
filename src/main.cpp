@@ -366,7 +366,7 @@ int main(int argc, char **argv) {
             int display_w, display_h;
             glfwGetFramebufferSize(g_window, &display_w, &display_h);
             glViewport(0, 0, display_w, display_h);
-            glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
+            glClearColor(0.10f, 0.10f, 0.12f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
 
             UI::UIManager::instance().render(config);
