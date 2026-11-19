@@ -259,10 +259,8 @@ void UIManager::render_header(AppConfig &config) {
 
     if (!config.virtual_mic_enabled) {
         ImGui::TextDisabled("| Virtual Mic: Disabled [Local Playback Only]");
-    } else if (healthy) {
-        ImGui::TextColored(ImVec4(0.2f, 0.9f, 0.2f, 1.0f), "| Virtual Mic: VoxBoard_Virtual_Microphone [Active]");
-    } else {
-        ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.2f, 1.0f), "| Virtual Mic: Missing/Error [Check Virtual Mic Setup]");
+    } else if (!healthy) {
+        ImGui::TextColored(Theme::Danger, "| Virtual Mic: Missing/Error [Check Virtual Mic Setup]");
     }
 
     ImGui::Spacing();
